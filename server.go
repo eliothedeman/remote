@@ -266,7 +266,7 @@ func (s *Server) Bucket(req BucketRequest, resp *BucketResponse) error {
 	return nil
 }
 
-// DeleteBucket creates a new transaction with the given mode.
+// DeleteBucket removes the bucket with the given key.
 func (s *Server) DeleteBucket(req BucketRequest, resp *BucketResponse) error {
 	c := s.getContext(req.ContextID)
 	if c == nil {
@@ -278,7 +278,7 @@ func (s *Server) DeleteBucket(req BucketRequest, resp *BucketResponse) error {
 	return err
 }
 
-// CreateBucket creates a new transaction with the given mode.
+// CreateBucket creates a new bucket with the given name.
 func (s *Server) CreateBucket(req BucketRequest, resp *BucketResponse) error {
 	c := s.getContext(req.ContextID)
 	if c == nil {
@@ -297,7 +297,7 @@ func (s *Server) CreateBucket(req BucketRequest, resp *BucketResponse) error {
 	return nil
 }
 
-// CreateBucketIfNotExists creates a new transaction with the given mode.
+// CreateBucketIfNotExists creates a new bucket if it doesn't already exist. Returns the bucket regardless.
 func (s *Server) CreateBucketIfNotExists(req BucketRequest, resp *BucketResponse) error {
 	c := s.getContext(req.ContextID)
 	if c == nil {
@@ -328,7 +328,7 @@ type GetResponse struct {
 	Val []byte
 }
 
-// Get creates a new transaction with the given mode.
+// Get returns the value stored at the given key.
 func (s *Server) Get(req *GetReqeust, resp *GetResponse) error {
 	c := s.getContext(req.ContextID)
 	b := c.getBucket(req.BucketID)
@@ -354,7 +354,7 @@ type PutReqeust struct {
 type PutResponse struct {
 }
 
-// Put creates a new transaction with the given mode.
+// Put inserts the given value at the given key.
 func (s *Server) Put(req *PutReqeust, resp *PutResponse) error {
 	c := s.getContext(req.ContextID)
 	b := c.getBucket(req.BucketID)
