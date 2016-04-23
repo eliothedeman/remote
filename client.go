@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/ugorji/go/codec"
 )
 
 // RClient is a remote view to the remote server.
 type RClient struct {
 	conn io.ReadWriteCloser
 	c    *rpc.Client
+	host string
 }
 
 func (r *RClient) call(name string, args, resp interface{}) error {
@@ -21,10 +23,12 @@ func (r *RClient) call(name string, args, resp interface{}) error {
 
 func dialRemoteClient(host string) (*RClient, error) {
 	c, err := net.DialTimeout("tcp4", host, time.Second*1)
+	cod := codec.MsgpackSpecRpc.ClientCodec(c, rpcHandle())
 
 	return &RClient{
 		conn: c,
-		c:    rpc.NewClient(c),
+		c:    rpc.NewClientWithCodec(cod),
+		host: host,
 	}, err
 }
 func (r *RClient) genTx() *RTx {
@@ -45,6 +49,11 @@ func (r *RClient) begin(write bool) (*RTx, error) {
 		r:         r,
 		contextID: resp.ContextID,
 	}, err
+}
+
+// Path returns the host of the remote client
+func (r *RClient) Path() string {
+	return "tcp://" + r.host
 }
 
 // Begin a transaction.

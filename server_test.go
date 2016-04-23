@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/ugorji/go/codec"
 )
 
 type testReadWriteCloser struct {
@@ -40,10 +42,11 @@ func run(f func(*Server, *RClient)) {
 	src, dst := testConn()
 
 	go s.ServeConn(dst)
+	cod := codec.MsgpackSpecRpc.ClientCodec(src, &codec.MsgpackHandle{})
 
 	c := &RClient{
 		conn: src,
-		c:    rpc.NewClient(src),
+		c:    rpc.NewClientWithCodec(cod),
 	}
 
 	f(s, c)

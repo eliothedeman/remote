@@ -1,5 +1,9 @@
 package remote
 
+//go:generate msgp -tests=false
+//msgp:ignore PingRequest PingResponse Server Context
+//go:generate codecgen -o values.generated.go server.go server_gen.go
+
 import (
 	"errors"
 	"io"
@@ -10,7 +14,12 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/ugorji/go/codec"
 )
+
+func rpcHandle() codec.Handle {
+	return &codec.MsgpackHandle{}
+}
 
 type parent interface {
 	Bucket(key []byte) *bolt.Bucket
@@ -21,10 +30,10 @@ type parent interface {
 
 // A Server runs a remote view to a boltdb.
 type Server struct {
-	db       *bolt.DB
-	contexts map[uint64]*Context
-	cCount   uint64
-	sync.RWMutex
+	db           *bolt.DB
+	contexts     map[uint64]*Context
+	cCount       uint64
+	sync.RWMutex `msg:"-"`
 }
 
 // OpenServer opens a bolt db and and wraps it in a server.
@@ -47,18 +56,24 @@ func (s *Server) ServeTCP(addr string) error {
 		return err
 	}
 
-	srv := rpc.NewServer()
+	var conn net.Conn
+	for {
+		conn, err = l.Accept()
+		if err != nil {
+			break
+		}
+		go s.ServeConn(conn)
+	}
 
-	srv.RegisterName("srv", s)
-	srv.Accept(l)
-	return nil
+	return err
 }
 
 // ServeConn will serve the rpc via a io.ReadWriteCloser
 func (s *Server) ServeConn(conn io.ReadWriteCloser) error {
 	srv := rpc.NewServer()
 	srv.RegisterName("srv", s)
-	srv.ServeConn(conn)
+	cod := codec.MsgpackSpecRpc.ServerCodec(conn, rpcHandle())
+	srv.ServeCodec(cod)
 	return nil
 }
 
@@ -94,12 +109,12 @@ func (s *Server) closeContext(c *Context) {
 
 // A Context holds information about a transaction.
 type Context struct {
-	sync.RWMutex
-	id      uint64
-	tx      *bolt.Tx
-	parent  parent
-	bCount  uint64
-	buckets map[uint64]*bolt.Bucket
+	sync.RWMutex `msg:"-"`
+	id           uint64
+	tx           *bolt.Tx
+	parent       parent
+	bCount       uint64
+	buckets      map[uint64]*bolt.Bucket
 }
 
 func (c *Context) getBucket(id uint64) *bolt.Bucket {

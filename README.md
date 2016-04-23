@@ -25,8 +25,8 @@ So far only basic operations are covered.
 - [x] Close
 - [ ] GoString
 - [ ] Info
-- [ ] IsReadOnly
-- [ ] Path
+- [x] IsReadOnly
+- [x] Path
 - [ ] Stats
 - [ ] String
 - [ ] Sync
