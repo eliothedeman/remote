@@ -21,7 +21,7 @@ So far only basic operations are covered.
 
 ### DB
 - [ ] Batch
-- [ ] Begin
+- [x] Begin
 - [x] Close
 - [ ] GoString
 - [ ] Info
@@ -50,9 +50,8 @@ So far only basic operations are covered.
 - [ ] Writeable
 
 ### Tx
-- [ ] Begin
 - [x] Bucket
-- [ ] Commit
+- [x] Commit
 - [x] CreateBucket
 - [x] CreateBucketIfNotExists
 - [ ] Copy
@@ -63,7 +62,7 @@ So far only basic operations are covered.
 - [ ] ForEach
 - [ ] OnCommit
 - [ ] Page
-- [ ] Rollback
+- [x] Rollback
 - [ ] Size
 - [ ] Writeable
 - [ ] WriteTo

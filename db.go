@@ -12,6 +12,7 @@ var (
 
 // DB provides an interface to a boltdb
 type DB interface {
+	Begin(writeable bool) (Tx, error)
 	Close() error
 	View(func(tx Tx) error) error
 	Update(func(tx Tx) error) error

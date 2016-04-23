@@ -47,6 +47,11 @@ func (r *RClient) begin(write bool) (*RTx, error) {
 	}, err
 }
 
+// Begin a transaction.
+func (r *RClient) Begin(writeable bool) (Tx, error) {
+	return r.begin(writeable)
+}
+
 func (r *RClient) commit(id uint64) error {
 	resp := &CommitTransactionResponse{}
 	return r.call("srv.CommitTransaction", id, resp)
@@ -55,6 +60,11 @@ func (r *RClient) commit(id uint64) error {
 func (r *RClient) rollback(id uint64) error {
 	resp := &RollbackTransactionResponse{}
 	return r.call("srv.RollbackTransaction", id, resp)
+}
+
+// IsReadOnly or not?
+func (r *RClient) IsReadOnly() bool {
+	return false
 }
 
 // Close the connection to the database.
@@ -92,24 +102,30 @@ func (r *RClient) Update(f func(tx Tx) error) error {
 
 // LClient is a local view to a boltdb.
 type LClient struct {
-	db *bolt.DB
+	*bolt.DB
 }
 
 func newLocalClient(path string, options *bolt.Options) (*LClient, error) {
 	db, err := bolt.Open(path, 0777, options)
 	return &LClient{
-		db: db,
+		DB: db,
 	}, err
+}
+
+// Begin a transaction.
+func (l *LClient) Begin(writeable bool) (Tx, error) {
+	tx, err := l.DB.Begin(writeable)
+	return l.genTx(tx), err
 }
 
 // Close the underlying database.
 func (l *LClient) Close() error {
-	return l.db.Close()
+	return l.DB.Close()
 }
 
 // View opens the database for read only operation.
 func (l *LClient) View(f func(Tx) error) error {
-	return l.db.View(func(t *bolt.Tx) error {
+	return l.DB.View(func(t *bolt.Tx) error {
 		tx := l.genTx(t)
 		return f(tx)
 	})
@@ -117,7 +133,7 @@ func (l *LClient) View(f func(Tx) error) error {
 
 // Update opens the database for read/write operations.
 func (l *LClient) Update(f func(Tx) error) error {
-	return l.db.Update(func(t *bolt.Tx) error {
+	return l.DB.Update(func(t *bolt.Tx) error {
 		tx := l.genTx(t)
 		return f(tx)
 	})

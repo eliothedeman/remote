@@ -10,10 +10,12 @@ var (
 // Tx is a transaction
 type Tx interface {
 	Bucket(name []byte) Bucket
-	DB() DB
+	Commit() error
 	CreateBucket(name []byte) (Bucket, error)
 	CreateBucketIfNotExists(name []byte) (Bucket, error)
+	DB() DB
 	DeleteBucket(name []byte) error
+	Rollback() error
 }
 
 // RTx is a local transaction.
@@ -42,6 +44,16 @@ func (r *RTx) Bucket(name []byte) Bucket {
 // DB returns the database that this transaction is from.
 func (r *RTx) DB() DB {
 	return r.r
+}
+
+// Commit this transaction.
+func (r *RTx) Commit() error {
+	return r.r.commit(r.contextID)
+}
+
+// Rollback this transaction.
+func (r *RTx) Rollback() error {
+	return r.r.rollback(r.contextID)
 }
 
 // CreateBucket creates and returns a new bucket.
@@ -97,6 +109,16 @@ func (l *LTx) Bucket(name []byte) Bucket {
 	return &LBucket{
 		b: b,
 	}
+}
+
+// Commit this transaction.
+func (l *LTx) Commit() error {
+	return l.tx.Commit()
+}
+
+// Rollback this transaction.
+func (l *LTx) Rollback() error {
+	return l.tx.Rollback()
 }
 
 // DB returns the database that this transaction is from.
