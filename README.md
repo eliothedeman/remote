@@ -27,7 +27,7 @@ So far only basic operations are covered.
 - [ ] Info
 - [x] IsReadOnly
 - [x] Path
-- [ ] Stats
+- [x] Stats
 - [ ] String
 - [ ] Sync
 - [x] Update
@@ -45,9 +45,9 @@ So far only basic operations are covered.
 - [ ] NextSequence
 - [x] Put
 - [ ] Root
-- [ ] Stats
-- [ ] Tx
-- [ ] Writeable
+- [x] Stats
+- [x] Tx
+- [x] Writeable
 
 ### Tx
 - [x] Bucket

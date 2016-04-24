@@ -2,6 +2,7 @@ package remote
 
 import (
 	"io"
+	"log"
 	"net"
 	"net/rpc"
 	"time"
@@ -54,6 +55,16 @@ func (r *RClient) begin(write bool) (*RTx, error) {
 // Path returns the host of the remote client
 func (r *RClient) Path() string {
 	return "tcp://" + r.host
+}
+
+// Stats returns stats about this database.
+func (r *RClient) Stats() bolt.Stats {
+	resp := &DBStatsResponse{}
+	err := r.call("srv.DBStats", Empty{}, resp)
+	if err != nil {
+		log.Println(err)
+	}
+	return resp.Stats
 }
 
 // Begin a transaction.

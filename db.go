@@ -17,6 +17,7 @@ type DB interface {
 	Path() string
 	View(func(tx Tx) error) error
 	Update(func(tx Tx) error) error
+	Stats() bolt.Stats
 }
 
 // Open returns a new view to a database.

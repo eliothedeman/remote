@@ -1,7 +1,7 @@
 package remote
 
 //go:generate msgp -tests=false
-//msgp:ignore PingRequest PingResponse Server Context
+//msgp:ignore PingRequest PingResponse Server Context DBStatsResponse BucketStatsResponse
 //go:generate codecgen -o values.generated.go server.go server_gen.go
 
 import (
@@ -189,6 +189,50 @@ func (p *PingResponse) RoundTrip() time.Duration {
 func (s *Server) Ping(req PingRequest, resp *PingResponse) error {
 	resp.From = time.Now()
 	resp.To = resp.From.Sub(req.T)
+	return nil
+}
+
+// Empty requests/responses are for functions that do not requre inputs.
+type Empty struct {
+}
+
+// DBStatsResponse contains boltdb stats.
+type DBStatsResponse struct {
+	bolt.Stats
+}
+
+// DBStats returns database level stats
+func (s *Server) DBStats(Empty, resp *DBStatsResponse) error {
+	stats := s.db.Stats()
+	resp.Stats = stats
+	return nil
+}
+
+// BucketStatsRequest contains stats about a bucket.
+type BucketStatsRequest struct {
+	ContextID uint64
+	BucketID  uint64
+}
+
+// BucketStatsResponse contains stats about a bucket.
+type BucketStatsResponse struct {
+	bolt.BucketStats
+}
+
+// BucketStats returns the stats about a bucket.
+func (s *Server) BucketStats(req *BucketStatsRequest, resp *BucketStatsResponse) error {
+	c := s.getContext(req.ContextID)
+	if c == nil {
+		return errors.New("Context not found.")
+	}
+
+	b := c.getBucket(req.BucketID)
+	if b == nil {
+		return errors.New("Bucket not found")
+	}
+
+	resp.BucketStats = b.Stats()
+
 	return nil
 }
 

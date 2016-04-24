@@ -35,6 +35,7 @@ func (r *RTx) Bucket(name []byte) Bucket {
 		return nil
 	}
 	b := &RBucket{}
+	b.tx = r
 	b.r = r.r
 	b.id = resp.BucketID
 	b.parent = resp.BucketContextID
@@ -64,6 +65,7 @@ func (r *RTx) CreateBucket(name []byte) (Bucket, error) {
 	req.ContextID = r.contextID
 	err := r.r.call("srv.CreateBucket", req, resp)
 	b := &RBucket{}
+	b.tx = r
 	b.r = r.r
 	b.id = resp.BucketID
 	b.parent = resp.BucketContextID
@@ -78,6 +80,7 @@ func (r *RTx) CreateBucketIfNotExists(name []byte) (Bucket, error) {
 	req.ContextID = r.contextID
 	err := r.r.call("srv.CreateBucketIfNotExists", req, resp)
 	b := &RBucket{}
+	b.tx = r
 	b.r = r.r
 	b.id = resp.BucketID
 	b.parent = resp.BucketContextID
@@ -107,7 +110,8 @@ func (l *LTx) Bucket(name []byte) Bucket {
 	}
 
 	return &LBucket{
-		b: b,
+		b:  b,
+		tx: l,
 	}
 }
 
@@ -134,7 +138,8 @@ func (l *LTx) CreateBucket(name []byte) (Bucket, error) {
 	}
 
 	return &LBucket{
-		b: b,
+		b:  b,
+		tx: l,
 	}, nil
 }
 
@@ -146,7 +151,8 @@ func (l *LTx) CreateBucketIfNotExists(name []byte) (Bucket, error) {
 	}
 
 	return &LBucket{
-		b: b,
+		b:  b,
+		tx: l,
 	}, nil
 }
 

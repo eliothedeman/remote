@@ -1,6 +1,10 @@
 package remote
 
-import "github.com/boltdb/bolt"
+import (
+	"log"
+
+	"github.com/boltdb/bolt"
+)
 
 // Bucket is an interface into a bolt bucket.
 type Bucket interface {
@@ -10,13 +14,27 @@ type Bucket interface {
 	DeleteBucket(name []byte) error
 	Get(key []byte) []byte
 	Put(key, value []byte) error
+	Stats() bolt.BucketStats
+	Tx() Tx
+	Writeable() bool
 }
 
 // RBucket is a remote bucket.
 type RBucket struct {
 	r      *RClient
+	tx     *RTx
 	id     uint64
 	parent uint64
+}
+
+// Writeable will always be true.
+func (r *RBucket) Writeable() bool {
+	return true
+}
+
+// Tx returns the transaction this bucket is a part of.
+func (r *RBucket) Tx() Tx {
+	return r.tx
 }
 
 // Bucket returns the bucket with the given name
@@ -30,6 +48,7 @@ func (r *RBucket) Bucket(name []byte) Bucket {
 		return nil
 	}
 	b := &RBucket{}
+	b.tx = r.tx
 	b.r = r.r
 	b.id = resp.BucketID
 	b.parent = resp.BucketContextID
@@ -44,6 +63,7 @@ func (r *RBucket) CreateBucket(name []byte) (Bucket, error) {
 	req.ContextID = r.parent
 	err := r.r.call("srv.CreateBucket", req, resp)
 	b := &RBucket{}
+	b.tx = r.tx
 	b.r = r.r
 	b.id = resp.BucketID
 	b.parent = resp.BucketContextID
@@ -58,6 +78,7 @@ func (r *RBucket) CreateBucketIfNotExists(name []byte) (Bucket, error) {
 	req.ContextID = r.parent
 	err := r.r.call("srv.CreateBucketIfNotExists", req, resp)
 	b := &RBucket{}
+	b.tx = r.tx
 	b.r = r.r
 	b.id = resp.BucketID
 	b.parent = resp.BucketContextID
@@ -98,9 +119,36 @@ func (r *RBucket) Put(key, value []byte) error {
 	return r.r.call("srv.Put", req, resp)
 }
 
+// Stats returns the stats of a bucket.
+func (r *RBucket) Stats() bolt.BucketStats {
+	resp := &BucketStatsResponse{}
+	err := r.r.call("srv.BucketStats", Empty{}, resp)
+	if err != nil {
+		log.Println(err)
+	}
+
+	return resp.BucketStats
+}
+
 // LBucket is a local bucket
 type LBucket struct {
-	b *bolt.Bucket
+	tx *LTx
+	b  *bolt.Bucket
+}
+
+// Writeable is this a read only bucket?
+func (l *LBucket) Writeable() bool {
+	return l.b.Writable()
+}
+
+// Tx returns the parent transaction of the bucket.
+func (l *LBucket) Tx() Tx {
+	return l.tx
+}
+
+// Stats returns the stats about this bucket.
+func (l *LBucket) Stats() bolt.BucketStats {
+	return l.b.Stats()
 }
 
 // Bucket returns the bucket with the given name if it exists.
