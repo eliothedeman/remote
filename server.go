@@ -457,3 +457,20 @@ func (s *Server) BucketForEach(req *BucketForEachRequest, resp *BucketForEachRes
 		return nil
 	})
 }
+
+// NextSequenceRequest gives context for the next sequence call.
+type NextSequenceRequest struct {
+	ContextID uint64
+	BucketID  uint64
+}
+
+// NextSequence will return the next unique ID for this bucket.
+func (s *Server) NextSequence(req *NextSequenceRequest, resp *uint64) error {
+	c := s.getContext(req.ContextID)
+	b := c.getBucket(req.BucketID)
+
+	id, err := b.NextSequence()
+
+	*resp = id
+	return err
+}

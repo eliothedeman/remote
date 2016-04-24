@@ -42,7 +42,7 @@ So far only basic operations are covered.
 - [x] DeleteBucket
 - [x] ForEach
 - [x] Get
-- [ ] NextSequence
+- [x] NextSequence
 - [x] Put
 - [ ] Root
 - [x] Stats

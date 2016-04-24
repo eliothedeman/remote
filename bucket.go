@@ -15,6 +15,7 @@ type Bucket interface {
 	Get(key []byte) []byte
 	Put(key, value []byte) error
 	ForEach(func(k, v []byte) error) error
+	NextSequence() (uint64, error)
 	Stats() bolt.BucketStats
 	Tx() Tx
 	Writeable() bool
@@ -153,6 +154,17 @@ func (r *RBucket) Stats() bolt.BucketStats {
 	return resp.BucketStats
 }
 
+// NextSequence returns the next unique id for this bucket.
+func (r *RBucket) NextSequence() (uint64, error) {
+	var resp uint64
+	req := &NextSequenceRequest{}
+	req.BucketID = r.id
+	req.ContextID = r.parent
+
+	err := r.r.call("srv.NextSequence", req, &resp)
+	return resp, err
+}
+
 // LBucket is a local bucket
 type LBucket struct {
 	tx *LTx
@@ -217,4 +229,9 @@ func (l *LBucket) Get(key []byte) []byte {
 // Put inserts the given value at the givne key.
 func (l *LBucket) Put(key, value []byte) error {
 	return l.b.Put(key, value)
+}
+
+// NextSequence inserts the given value at the givne key.
+func (l *LBucket) NextSequence() (uint64, error) {
+	return l.b.NextSequence()
 }
