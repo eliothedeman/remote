@@ -40,7 +40,7 @@ So far only basic operations are covered.
 - [ ] Cursor
 - [x] Delete
 - [x] DeleteBucket
-- [ ] ForEach
+- [x] ForEach
 - [x] Get
 - [ ] NextSequence
 - [x] Put

@@ -85,6 +85,7 @@ func (s *Server) getContext(id uint64) *Context {
 	if !ok {
 		return nil
 	}
+
 	return c
 }
 
@@ -274,6 +275,8 @@ func (s *Server) CommitTransaction(contextID uint64, c *CommitTransactionRespons
 		return errors.New("Context not found")
 
 	}
+
+	log.Println("Commiting transaction", contextID)
 	s.closeContext(ctx)
 	return ctx.tx.Commit()
 }
@@ -288,6 +291,8 @@ func (s *Server) RollbackTransaction(contextID uint64, r *RollbackTransactionRes
 	if ctx == nil {
 		return errors.New("Transaction not found")
 	}
+
+	log.Println("Rolling back transaction", contextID)
 
 	s.closeContext(ctx)
 	return ctx.tx.Rollback()
@@ -423,4 +428,32 @@ func (s *Server) Put(req *PutReqeust, resp *PutResponse) error {
 	}
 
 	return b.Put(req.Key, req.Val)
+}
+
+// BucketForEachRequest gives context for the requst.
+type BucketForEachRequest struct {
+	ContextID uint64
+	BucketID  uint64
+}
+
+// BucketForEachResponse is a response of every key value pair in a bucket.
+type BucketForEachResponse struct {
+	Keys   [][]byte
+	Values [][]byte
+}
+
+// BucketForEach runs back all k,v pairs so that a function can be run over them.
+func (s *Server) BucketForEach(req *BucketForEachRequest, resp *BucketForEachResponse) error {
+	c := s.getContext(req.ContextID)
+	b := c.getBucket(req.BucketID)
+
+	stats := b.Stats()
+	resp.Keys = make([][]byte, 0, stats.KeyN)
+	resp.Values = make([][]byte, 0, stats.KeyN)
+
+	return b.ForEach(func(k, v []byte) error {
+		resp.Keys = append(resp.Keys, k)
+		resp.Values = append(resp.Values, v)
+		return nil
+	})
 }

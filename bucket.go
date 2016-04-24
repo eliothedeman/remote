@@ -14,6 +14,7 @@ type Bucket interface {
 	DeleteBucket(name []byte) error
 	Get(key []byte) []byte
 	Put(key, value []byte) error
+	ForEach(func(k, v []byte) error) error
 	Stats() bolt.BucketStats
 	Tx() Tx
 	Writeable() bool
@@ -30,6 +31,28 @@ type RBucket struct {
 // Writeable will always be true.
 func (r *RBucket) Writeable() bool {
 	return true
+}
+
+// ForEach k,v pair
+// TODO this needs pagination.
+func (r *RBucket) ForEach(f func(k, v []byte) error) error {
+	req := &BucketForEachRequest{}
+	resp := &BucketForEachResponse{}
+	req.BucketID = r.id
+	req.ContextID = r.parent
+
+	err := r.r.call("srv.BucketForEach", req, resp)
+	if err != nil {
+		return err
+	}
+
+	for i := range resp.Keys {
+		err = f(resp.Keys[i], resp.Values[i])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Tx returns the transaction this bucket is a part of.
@@ -134,6 +157,11 @@ func (r *RBucket) Stats() bolt.BucketStats {
 type LBucket struct {
 	tx *LTx
 	b  *bolt.Bucket
+}
+
+// ForEach a func on every k,v.
+func (l *LBucket) ForEach(f func(k, v []byte) error) error {
+	return l.b.ForEach(f)
 }
 
 // Writeable is this a read only bucket?

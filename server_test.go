@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eliothedeman/randutil"
 	"github.com/ugorji/go/codec"
 )
 
@@ -146,6 +147,46 @@ func TestGetPut(t *testing.T) {
 			return nil
 
 		})
+		if err != nil {
+			t.Error(err)
+		}
+	})
+}
+func TestBucketForEach(t *testing.T) {
+	run(func(s *Server, c *RClient) {
+		err := c.Update(func(tx Tx) error {
+			b, err := tx.CreateBucketIfNotExists([]byte("hello"))
+			if err != nil {
+				t.Error(err)
+				return err
+			}
+
+			for i := 0; i < 100; i++ {
+				b.Put(randutil.Bytes(10), randutil.Bytes(10))
+			}
+			return nil
+		})
+
+		if err != nil {
+			t.Error(err)
+		}
+		err = c.View(func(tx Tx) error {
+			b := tx.Bucket([]byte("hello"))
+
+			var count int
+			err = b.ForEach(func(k, v []byte) error {
+				count++
+				return nil
+			})
+
+			if count != 100 {
+				t.FailNow()
+			}
+
+			return err
+
+		})
+
 		if err != nil {
 			t.Error(err)
 		}
