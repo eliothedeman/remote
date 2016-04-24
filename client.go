@@ -24,7 +24,7 @@ func (r *RClient) call(name string, args, resp interface{}) error {
 
 func dialRemoteClient(host string) (*RClient, error) {
 	c, err := net.DialTimeout("tcp4", host, time.Second*1)
-	cod := codec.MsgpackSpecRpc.ClientCodec(c, rpcHandle())
+	cod := codec.GoRpc.ClientCodec(c, rpcHandle())
 
 	return &RClient{
 		conn: c,

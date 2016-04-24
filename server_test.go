@@ -43,7 +43,7 @@ func run(f func(*Server, *RClient)) {
 	src, dst := testConn()
 
 	go s.ServeConn(dst)
-	cod := codec.MsgpackSpecRpc.ClientCodec(src, &codec.MsgpackHandle{})
+	cod := codec.GoRpc.ClientCodec(src, &codec.MsgpackHandle{})
 
 	c := &RClient{
 		conn: src,

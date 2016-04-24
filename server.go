@@ -72,7 +72,7 @@ func (s *Server) ServeTCP(addr string) error {
 func (s *Server) ServeConn(conn io.ReadWriteCloser) error {
 	srv := rpc.NewServer()
 	srv.RegisterName("srv", s)
-	cod := codec.MsgpackSpecRpc.ServerCodec(conn, rpcHandle())
+	cod := codec.GoRpc.ServerCodec(conn, rpcHandle())
 	srv.ServeCodec(cod)
 	return nil
 }
