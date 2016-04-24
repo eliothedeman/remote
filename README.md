@@ -1,5 +1,5 @@
-# remote
-Remote access to boltdb files via rpc
+# Remote [![GoDoc](https://godoc.org/github.com/eliothedeman/remote?status.svg)](https://godoc.org/github.com/eliothedeman/remote)
+Remote access to [boltdb](https://github.com/boltdb/bolt) files via rpc
 
 ## Mission
 Expose the same great api of boltdb over the network.
