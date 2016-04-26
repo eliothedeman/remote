@@ -15,16 +15,27 @@ type Tx interface {
 	CreateBucketIfNotExists(name []byte) (Bucket, error)
 	DB() DB
 	DeleteBucket(name []byte) error
+	OnCommit(h func())
 	Rollback() error
 }
 
 // RTx is a local transaction.
 type RTx struct {
-	r         *RClient
-	contextID uint64
+	r              *RClient
+	contextID      uint64
+	commitHandlers []func()
 }
 
-// Bucket returns the bucket with the given name
+// OnCommit adds a handler to be called when a transaction is commited.
+func (r *RTx) OnCommit(h func()) {
+	if r.commitHandlers == nil {
+		r.commitHandlers = []func(){h}
+		return
+	}
+	r.commitHandlers = append(r.commitHandlers, h)
+}
+
+// Bucket returns the bucket with the given name.
 func (r *RTx) Bucket(name []byte) Bucket {
 	req := &BucketRequest{}
 	req.Key = name
@@ -49,7 +60,11 @@ func (r *RTx) DB() DB {
 
 // Commit this transaction.
 func (r *RTx) Commit() error {
-	return r.r.commit(r.contextID)
+	err := r.r.commit(r.contextID)
+	for i := range r.commitHandlers {
+		r.commitHandlers[i]()
+	}
+	return err
 }
 
 // Rollback this transaction.
@@ -113,6 +128,12 @@ func (l *LTx) Bucket(name []byte) Bucket {
 		b:  b,
 		tx: l,
 	}
+
+}
+
+// OnCommit adds a handelr to be called after commit is called.
+func (l *LTx) OnCommit(h func()) {
+	l.tx.OnCommit(h)
 }
 
 // Commit this transaction.

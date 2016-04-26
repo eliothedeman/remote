@@ -60,7 +60,7 @@ So far only basic operations are covered.
 - [x] DB
 - [x] DeleteBucket
 - [ ] ForEach
-- [ ] OnCommit
+- [x] OnCommit
 - [ ] Page
 - [x] Rollback
 - [ ] Size

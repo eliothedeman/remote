@@ -111,13 +111,13 @@ func (r *RClient) Update(f func(tx Tx) error) error {
 
 	err = f(t)
 	if err != nil {
-		rErr := r.rollback(t.contextID)
+		rErr := t.Rollback()
 		if rErr != nil {
 			return rErr
 		}
 		return err
 	}
-	return r.commit(t.contextID)
+	return t.Commit()
 }
 
 // LClient is a local view to a boltdb.
