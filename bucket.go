@@ -42,17 +42,26 @@ func (r *RBucket) ForEach(f func(k, v []byte) error) error {
 	req.BucketID = r.id
 	req.ContextID = r.parent
 
-	err := r.r.call("srv.BucketForEach", req, resp)
+	err := r.r.call("srv.BucketForEachStart", req, nil)
 	if err != nil {
 		return err
 	}
-
-	for i := range resp.Keys {
-		err = f(resp.Keys[i], resp.Values[i])
+	for {
+		err = r.r.call("srv.BucketForEachNext", req, resp)
 		if err != nil {
-			return err
+			return r.r.call("srv.BucketForEachStop", req, nil)
+		}
+
+		err = f(resp.Key, resp.Value)
+		if err != nil {
+			return r.r.call("srv.BucketForEachStop", req, nil)
+		}
+
+		if resp.Index >= resp.Size-1 {
+			break
 		}
 	}
+
 	return nil
 }
 

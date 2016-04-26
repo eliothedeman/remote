@@ -2,8 +2,8 @@ package main
 
 import (
 	"flag"
-	"log"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/eliothedeman/remote"
 )
 
@@ -20,9 +20,11 @@ func main() {
 		panic(err)
 	}
 
-	log.Println("Opened bolt database at path", *path)
+	logrus.WithFields(logrus.Fields{
+		"file_path": *path,
+		"address":   *listen,
+	}).Info("Starting server")
 
-	log.Println("Serving bolt database at", *listen)
 	err = s.ServeTCP(*listen)
 	if err != nil {
 		panic(err)

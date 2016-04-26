@@ -7,14 +7,20 @@ package remote
 import (
 	"errors"
 	"io"
-	"log"
 	"net"
 	"net/rpc"
 	"sync"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 	"github.com/ugorji/go/codec"
+)
+
+var (
+	errTransactionNotFound = errors.New("Transaction not found")
+	errContextNotFound     = errors.New("Context not found")
+	errBucketNotFound      = errors.New("Bucket not found")
 )
 
 func rpcHandle() codec.Handle {
@@ -104,18 +110,30 @@ func (s *Server) newContext(p parent) *Context {
 
 func (s *Server) closeContext(c *Context) {
 	s.Lock()
+	c.Lock()
 	delete(s.contexts, c.id)
+	if c.forEachCancel != nil {
+		close(c.forEachCancel)
+		c.forEachCancel = nil
+	}
+	if c.forEachOut != nil {
+		close(c.forEachOut)
+		c.forEachOut = nil
+	}
+	c.Unlock()
 	s.Unlock()
 }
 
 // A Context holds information about a transaction.
 type Context struct {
-	sync.RWMutex `msg:"-"`
-	id           uint64
-	tx           *bolt.Tx
-	parent       parent
-	bCount       uint64
-	buckets      map[uint64]*bolt.Bucket
+	sync.RWMutex  `msg:"-"`
+	id            uint64
+	tx            *bolt.Tx
+	parent        parent
+	bCount        uint64
+	buckets       map[uint64]*bolt.Bucket
+	forEachOut    chan *BucketForEachResponse
+	forEachCancel chan struct{}
 }
 
 func (c *Context) getBucket(id uint64) *bolt.Bucket {
@@ -224,12 +242,20 @@ type BucketStatsResponse struct {
 func (s *Server) BucketStats(req *BucketStatsRequest, resp *BucketStatsResponse) error {
 	c := s.getContext(req.ContextID)
 	if c == nil {
-		return errors.New("Context not found.")
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+		}).Error(errContextNotFound)
+
+		return errContextNotFound
 	}
 
 	b := c.getBucket(req.BucketID)
 	if b == nil {
-		return errors.New("Bucket not found")
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+			"bucket_id":  req.BucketID,
+		}).Error(errBucketNotFound)
+		return errBucketNotFound
 	}
 
 	resp.BucketStats = b.Stats()
@@ -259,7 +285,10 @@ func (s *Server) BeginTransaction(req *BeginTransactionRequest, resp *BeginTrans
 		s.closeContext(c)
 	}
 
-	log.Println("Created transaction with id", c.id)
+	logrus.WithFields(logrus.Fields{
+		"writeable":  req.Writable,
+		"context_id": c.id,
+	}).Info("Starting transaction")
 
 	return err
 }
@@ -275,8 +304,10 @@ func (s *Server) CommitTransaction(contextID uint64, c *CommitTransactionRespons
 		return errors.New("Context not found")
 
 	}
+	logrus.WithFields(logrus.Fields{
+		"context_id": ctx.id,
+	}).Info("Commiting transaction")
 
-	log.Println("Commiting transaction", contextID)
 	s.closeContext(ctx)
 	return ctx.tx.Commit()
 }
@@ -292,7 +323,9 @@ func (s *Server) RollbackTransaction(contextID uint64, r *RollbackTransactionRes
 		return errors.New("Transaction not found")
 	}
 
-	log.Println("Rolling back transaction", contextID)
+	logrus.WithFields(logrus.Fields{
+		"context_id": ctx.id,
+	}).Error("Rolling back transaction")
 
 	s.closeContext(ctx)
 	return ctx.tx.Rollback()
@@ -346,11 +379,18 @@ func (s *Server) DeleteBucket(req BucketRequest, resp *BucketResponse) error {
 func (s *Server) CreateBucket(req BucketRequest, resp *BucketResponse) error {
 	c := s.getContext(req.ContextID)
 	if c == nil {
-		return errors.New("Transaction not found")
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+		}).Error(errContextNotFound)
+		return errContextNotFound
 	}
 
 	b, id, err := c.createBucket(req.Key)
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+			"key":        string(req.Key),
+		}).Error(err)
 		return err
 	}
 
@@ -365,11 +405,18 @@ func (s *Server) CreateBucket(req BucketRequest, resp *BucketResponse) error {
 func (s *Server) CreateBucketIfNotExists(req BucketRequest, resp *BucketResponse) error {
 	c := s.getContext(req.ContextID)
 	if c == nil {
-		return errors.New("Transaction not found")
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+		}).Error(errContextNotFound)
+		return errContextNotFound
 	}
 
 	b, id, err := c.createBucketIfNotExists(req.Key)
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+			"key":        string(req.Key),
+		}).Error(err)
 		return err
 	}
 
@@ -392,16 +439,38 @@ type GetResponse struct {
 	Val []byte
 }
 
+func cnf(id uint64) error {
+	logrus.WithFields(logrus.Fields{
+		"context_id": id,
+	}).Error(errContextNotFound)
+	return errContextNotFound
+}
+
+func bnf(c, b uint64) error {
+	logrus.WithFields(logrus.Fields{
+		"context_id": c,
+		"bucket_id":  b,
+	}).Error(errBucketNotFound)
+	return errBucketNotFound
+}
+
 // Get returns the value stored at the given key.
 func (s *Server) Get(req *GetReqeust, resp *GetResponse) error {
 	c := s.getContext(req.ContextID)
+	if c == nil {
+		return cnf(req.ContextID)
+	}
 	b := c.getBucket(req.BucketID)
-
 	if b == nil {
-		return errors.New("Bucket not found.")
+		return bnf(req.ContextID, req.BucketID)
 	}
 
 	resp.Val = b.Get(req.Key)
+	logrus.WithFields(logrus.Fields{
+		"context_id": c,
+		"bucket_id":  b,
+		"key":        string(req.Key),
+	}).Debug("Get")
 
 	return nil
 }
@@ -421,11 +490,18 @@ type PutResponse struct {
 // Put inserts the given value at the given key.
 func (s *Server) Put(req *PutReqeust, resp *PutResponse) error {
 	c := s.getContext(req.ContextID)
-	b := c.getBucket(req.BucketID)
-
-	if b == nil {
-		return errors.New("Bucket not found.")
+	if c == nil {
+		return cnf(req.ContextID)
 	}
+	b := c.getBucket(req.BucketID)
+	if b == nil {
+		return bnf(req.ContextID, req.BucketID)
+	}
+	logrus.WithFields(logrus.Fields{
+		"context_id": c,
+		"bucket_id":  b,
+		"key":        string(req.Key),
+	}).Debug("Put")
 
 	return b.Put(req.Key, req.Val)
 }
@@ -438,24 +514,101 @@ type BucketForEachRequest struct {
 
 // BucketForEachResponse is a response of every key value pair in a bucket.
 type BucketForEachResponse struct {
-	Keys   [][]byte
-	Values [][]byte
+	Key         []byte
+	Value       []byte
+	Index, Size uint64
 }
 
-// BucketForEach runs back all k,v pairs so that a function can be run over them.
-func (s *Server) BucketForEach(req *BucketForEachRequest, resp *BucketForEachResponse) error {
+// BucketForEachStart runs back all k,v pairs so that a function can be run over them.
+func (s *Server) BucketForEachStart(req *BucketForEachRequest, resp *BucketForEachResponse) error {
 	c := s.getContext(req.ContextID)
 	b := c.getBucket(req.BucketID)
+	logrus.WithFields(logrus.Fields{
+		"context_id": req.ContextID,
+		"bucket_id":  req.BucketID,
+		"state":      "start",
+	}).Info("ForEach")
 
-	stats := b.Stats()
-	resp.Keys = make([][]byte, 0, stats.KeyN)
-	resp.Values = make([][]byte, 0, stats.KeyN)
+	c.Lock()
+	c.forEachOut = make(chan *BucketForEachResponse)
+	c.forEachCancel = make(chan struct{})
+	c.Unlock()
 
-	return b.ForEach(func(k, v []byte) error {
-		resp.Keys = append(resp.Keys, k)
-		resp.Values = append(resp.Values, v)
-		return nil
-	})
+	go func() {
+		var stopped bool
+		stats := b.Stats()
+		size := uint64(stats.KeyN)
+		var index uint64
+		b.ForEach(func(k, v []byte) error {
+
+			// if we are stopped we don't need to do anything else.
+			if stopped {
+				return nil
+			}
+			x := &BucketForEachResponse{}
+			x.Key = k
+			x.Value = v
+			x.Size = size
+			x.Index = index
+			select {
+			case <-c.forEachCancel:
+				stopped = true
+			case c.forEachOut <- x:
+				index++
+			}
+
+			return nil
+		})
+		logrus.WithFields(logrus.Fields{
+			"context_id": req.ContextID,
+			"bucket_id":  req.BucketID,
+			"state":      "complete",
+		}).Info("BucketForEach")
+
+		// clean up
+		c.Lock()
+		close(c.forEachCancel)
+		close(c.forEachOut)
+		c.forEachCancel = nil
+		c.forEachOut = nil
+		c.Unlock()
+
+	}()
+
+	return nil
+
+}
+
+// BucketForEachNext returns the next key value pair in the iteration.
+func (s *Server) BucketForEachNext(req *BucketForEachRequest, resp *BucketForEachResponse) error {
+
+	c := s.getContext(req.ContextID)
+	x := <-c.forEachOut
+	resp.Index = x.Index
+	resp.Size = x.Size
+	resp.Key = x.Key
+	resp.Value = x.Value
+
+	logrus.WithFields(logrus.Fields{
+		"context_id": req.ContextID,
+		"bucket_id":  req.BucketID,
+		"index":      resp.Index,
+		"size":       resp.Size,
+		"state":      "next",
+	}).Debug("BucketForEach")
+	return nil
+}
+
+// BucketForEachStop will stop the for-each loop.
+func (s *Server) BucketForEachStop(req *BucketForEachRequest, resp *Empty) error {
+	c := s.getContext(req.ContextID)
+	c.forEachCancel <- struct{}{}
+	logrus.WithFields(logrus.Fields{
+		"context_id": req.ContextID,
+		"bucket_id":  req.BucketID,
+	}).Info("BucketForEachStop")
+
+	return nil
 }
 
 // NextSequenceRequest gives context for the next sequence call.
