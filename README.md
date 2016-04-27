@@ -17,7 +17,8 @@ db, err := remote.Open("/home/user/local.db")
 ```
 
 ## Progress
-So far only basic operations are covered.
+Most common opperations are covered. Certain functions that are done through io
+interfaces have been put off until a better streaming system can be implemented.
 
 ### DB
 - [ ] Batch
@@ -66,3 +67,6 @@ So far only basic operations are covered.
 - [x] Size
 - [ ] Writeable
 - [ ] WriteTo
+
+## Plan
+Get the api down using the built in go rpc system, then make the move to gRPC to support other language client libraries.
