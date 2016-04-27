@@ -23,12 +23,12 @@ So far only basic operations are covered.
 - [ ] Batch
 - [x] Begin
 - [x] Close
-- [ ] GoString
-- [ ] Info
+- [x] GoString
+- [ ] Info (Not applicable)
 - [x] IsReadOnly
 - [x] Path
 - [x] Stats
-- [ ] String
+- [x] String
 - [ ] Sync
 - [x] Update
 - [x] View
@@ -61,8 +61,8 @@ So far only basic operations are covered.
 - [x] DeleteBucket
 - [ ] ForEach
 - [x] OnCommit
-- [ ] Page
+- [ ] Page (Not applicable)
 - [x] Rollback
-- [ ] Size
+- [x] Size
 - [ ] Writeable
 - [ ] WriteTo

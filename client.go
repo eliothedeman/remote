@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -50,6 +51,16 @@ func (r *RClient) begin(write bool) (*RTx, error) {
 		r:         r,
 		contextID: resp.ContextID,
 	}, err
+}
+
+// String returns the string representation of the client.
+func (r *RClient) String() string {
+	return fmt.Sprintf("<DB>%s", r.Path())
+}
+
+// GoString returns the go string representation of the client.
+func (r *RClient) GoString() string {
+	return fmt.Sprintf("remote.DB{path:%s}", r.Path())
 }
 
 // Path returns the host of the remote client

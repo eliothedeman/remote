@@ -17,6 +17,7 @@ type Tx interface {
 	DeleteBucket(name []byte) error
 	OnCommit(h func())
 	Rollback() error
+	Size() int64
 }
 
 // RTx is a local transaction.
@@ -24,6 +25,17 @@ type RTx struct {
 	r              *RClient
 	contextID      uint64
 	commitHandlers []func()
+}
+
+// Size returns the size of the database from the view of this transaction.
+func (r *RTx) Size() int64 {
+	var size uint64
+	err := r.r.call("srv.TransactionSize", r.contextID, &size)
+	if err != nil {
+		return -1
+	}
+
+	return int64(size)
 }
 
 // OnCommit adds a handler to be called when a transaction is commited.
@@ -180,4 +192,9 @@ func (l *LTx) CreateBucketIfNotExists(name []byte) (Bucket, error) {
 // DeleteBucket creates and returns a new bucket.
 func (l *LTx) DeleteBucket(name []byte) error {
 	return l.tx.DeleteBucket(name)
+}
+
+// Size returs the size of the database.
+func (l *LTx) Size() int64 {
+	return l.tx.Size()
 }

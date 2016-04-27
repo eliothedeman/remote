@@ -14,6 +14,8 @@ var (
 type DB interface {
 	Begin(writeable bool) (Tx, error)
 	Close() error
+	String() string
+	GoString() string
 	Path() string
 	View(func(tx Tx) error) error
 	Update(func(tx Tx) error) error

@@ -611,6 +611,18 @@ func (s *Server) BucketForEachStop(req *BucketForEachRequest, resp *Empty) error
 	return nil
 }
 
+// TransactionSize returns the size of the database from the view of the current transaction.
+func (s *Server) TransactionSize(contextID uint64, size *uint64) error {
+	c := s.getContext(contextID)
+	if c == nil {
+		return cnf(contextID)
+	}
+
+	*size = uint64(c.tx.Size())
+
+	return nil
+}
+
 // NextSequenceRequest gives context for the next sequence call.
 type NextSequenceRequest struct {
 	ContextID uint64
