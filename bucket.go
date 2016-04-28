@@ -73,9 +73,9 @@ func (r *RBucket) Tx() Tx {
 // Bucket returns the bucket with the given name
 func (r *RBucket) Bucket(name []byte) Bucket {
 	req := &BucketRequest{}
-	req.Key = name
+	req.Key = string(name)
 	resp := &BucketResponse{}
-	req.ContextID = r.parent
+	req.Ctx.Id = r.parent
 	err := r.r.call("srv.Bucket", req, resp)
 	if err != nil {
 		return nil
@@ -84,7 +84,7 @@ func (r *RBucket) Bucket(name []byte) Bucket {
 	b.tx = r.tx
 	b.r = r.r
 	b.id = resp.BucketID
-	b.parent = resp.BucketContextID
+	b.parent = resp.Ctx.Id
 	return b
 }
 
@@ -138,7 +138,7 @@ func (r *RBucket) Get(key []byte) []byte {
 	if err != nil {
 		return nil
 	}
-	return resp.Val
+	return []byte(resp.Val)
 }
 
 // Put inserts the given value at the given key.

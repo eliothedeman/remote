@@ -5,7 +5,6 @@ import (
 	"net/rpc"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/eliothedeman/randutil"
 	"github.com/ugorji/go/codec"
@@ -57,11 +56,7 @@ func run(f func(*Server, *RClient)) {
 func TestServe(t *testing.T) {
 	run(func(s *Server, c *RClient) {
 		resp := &PingResponse{}
-		c.call("srv.Ping", &PingRequest{T: time.Now()}, resp)
-
-		if resp.RoundTrip() > time.Millisecond {
-			t.Fail()
-		}
+		c.call("srv.Ping", &Empty{}, resp)
 	})
 }
 

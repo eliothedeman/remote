@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/boltdb/bolt"
 	"github.com/ugorji/go/codec"
@@ -188,43 +190,42 @@ func (c *Context) createBucketIfNotExists(name []byte) (*bolt.Bucket, uint64, er
 	return b, id, err
 }
 
-// PingRequest is a test ping request
-type PingRequest struct {
-	T time.Time
-}
-
-// PingResponse is a test ping result
-type PingResponse struct {
-	To   time.Duration
-	From time.Time
-}
-
-// RoundTrip gives the time the request took round trip
-func (p *PingResponse) RoundTrip() time.Duration {
-	return p.To + time.Now().Sub(p.From)
-}
-
 // Ping the remote server.
-func (s *Server) Ping(req PingRequest, resp *PingResponse) error {
-	resp.From = time.Now()
-	resp.To = resp.From.Sub(req.T)
-	return nil
+func (s *Server) Ping(ctx context.Context, in *Empty) (*PingResponse, error) {
+	t := time.Now()
+	out := &PingResponse{}
+	out.Received = &Time{
+		Seconds:  int64(t.Second()),
+		Nseconds: int32(t.Nanosecond()),
+	}
+
+	return out, nil
 }
 
-// Empty requests/responses are for functions that do not requre inputs.
-type Empty struct {
-}
+// DBStats returns database level stats.
+func (s *Server) DBStats(c context.Context, in *Empty) (*DBStatsResponse, error) {
+	x := s.db.Stats()
+	o := &DBStatsResponse{}
+	o.FreeAlloc = int64(x.FreeAlloc)
+	o.FreePageN = int64(x.FreePageN)
+	o.FreelistInuse = int64(x.FreelistInuse)
+	o.OpenTxN = int64(x.OpenTxN)
+	o.PendingPageN = int64(x.PendingPageN)
+	o.TxN = int64(x.TxN)
+	n := &TxStatsResponse{}
+	n.CursorCount = int64(x.TxStats.CursorCount)
+	n.NodeCount = int64(x.TxStats.NodeCount)
+	n.NodeDeref = int64(x.TxStats.NodeDeref)
+	n.PageAlloc = int64(x.TxStats.PageAlloc)
+	n.PageCount = int64(x.TxStats.PageCount)
+	n.Rebalance = int64(x.TxStats.Rebalance)
+	n.Spill = int64(x.TxStats.Spill)
+	n.SpillTime = int64(x.TxStats.SpillTime)
+	n.Write = int64(x.TxStats.Write)
+	n.WriteTime = int64(x.TxStats.WriteTime)
+	o.TxStats = n
 
-// DBStatsResponse contains boltdb stats.
-type DBStatsResponse struct {
-	bolt.Stats
-}
-
-// DBStats returns database level stats
-func (s *Server) DBStats(Empty, resp *DBStatsResponse) error {
-	stats := s.db.Stats()
-	resp.Stats = stats
-	return nil
+	return o, nil
 }
 
 // BucketStatsRequest contains stats about a bucket.
@@ -263,24 +264,15 @@ func (s *Server) BucketStats(req *BucketStatsRequest, resp *BucketStatsResponse)
 	return nil
 }
 
-// BeginTransactionRequest is the response to StartTransaction
-type BeginTransactionRequest struct {
-	Writable bool
-}
-
-// BeginTransactionResponse is the response to StartTransaction
-type BeginTransactionResponse struct {
-	ContextID uint64
-}
-
 // BeginTransaction creates a new transaction with the given mode.
-func (s *Server) BeginTransaction(req *BeginTransactionRequest, resp *BeginTransactionResponse) error {
+func (s *Server) BeginTransaction(ctx context.Context, req *BeginTransactionRequest) (*ContextHeader, error) {
 	c := s.newContext(nil)
+	resp := &ContextHeader{}
 
 	tx, err := s.db.Begin(req.Writable)
 	c.tx = tx
 	c.parent = tx
-	resp.ContextID = c.id
+	resp.Id = c.id
 	if err != nil {
 		s.closeContext(c)
 	}
@@ -290,18 +282,14 @@ func (s *Server) BeginTransaction(req *BeginTransactionRequest, resp *BeginTrans
 		"context_id": c.id,
 	}).Info("Starting transaction")
 
-	return err
-}
-
-// CommitTransactionResponse contains the stats for the transaction that was closed.
-type CommitTransactionResponse struct {
+	return resp, err
 }
 
 // CommitTransaction creates a new transaction with the given mode.
-func (s *Server) CommitTransaction(contextID uint64, c *CommitTransactionResponse) error {
+func (s *Server) CommitTransaction(c context.Context, h *ContextHeader) (*Empty, error) {
 	ctx := s.getContext(contextID)
 	if ctx == nil {
-		return errors.New("Context not found")
+		return nil, errors.New("Context not found")
 
 	}
 	logrus.WithFields(logrus.Fields{
@@ -309,18 +297,14 @@ func (s *Server) CommitTransaction(contextID uint64, c *CommitTransactionRespons
 	}).Info("Commiting transaction")
 
 	s.closeContext(ctx)
-	return ctx.tx.Commit()
-}
-
-// RollbackTransactionResponse contains the stats for the transaction that was closed.
-type RollbackTransactionResponse struct {
+	return nil, ctx.tx.Commit()
 }
 
 // RollbackTransaction creates a new transaction with the given mode.
-func (s *Server) RollbackTransaction(contextID uint64, r *RollbackTransactionResponse) error {
+func (s *Server) RollbackTransaction(c context.Context, h *ContextHeader) (*Empty, error) {
 	ctx := s.getContext(contextID)
 	if ctx == nil {
-		return errors.New("Transaction not found")
+		return nil, errors.New("Transaction not found")
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -328,19 +312,7 @@ func (s *Server) RollbackTransaction(contextID uint64, r *RollbackTransactionRes
 	}).Error("Rolling back transaction")
 
 	s.closeContext(ctx)
-	return ctx.tx.Rollback()
-}
-
-// BucketRequest contains the stats for the transaction that was closed.
-type BucketRequest struct {
-	ContextID uint64
-	Key       []byte
-}
-
-// BucketResponse contains the stats for the transaction that was closed.
-type BucketResponse struct {
-	BucketID        uint64
-	BucketContextID uint64
+	return nil, ctx.tx.Rollback()
 }
 
 // Bucket creates a new transaction with the given mode.
@@ -427,18 +399,6 @@ func (s *Server) CreateBucketIfNotExists(req BucketRequest, resp *BucketResponse
 	return nil
 }
 
-// GetReqeust has get request data.
-type GetReqeust struct {
-	BucketID  uint64
-	ContextID uint64
-	Key       []byte
-}
-
-// GetResponse has get request data.
-type GetResponse struct {
-	Val []byte
-}
-
 func cnf(id uint64) error {
 	logrus.WithFields(logrus.Fields{
 		"context_id": id,
@@ -455,14 +415,14 @@ func bnf(c, b uint64) error {
 }
 
 // Get returns the value stored at the given key.
-func (s *Server) Get(req *GetReqeust, resp *GetResponse) error {
+func (s *Server) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
 	c := s.getContext(req.ContextID)
 	if c == nil {
-		return cnf(req.ContextID)
+		return nil, cnf(req.ContextID)
 	}
 	b := c.getBucket(req.BucketID)
 	if b == nil {
-		return bnf(req.ContextID, req.BucketID)
+		return nil, bnf(req.ContextID, req.BucketID)
 	}
 
 	resp.Val = b.Get(req.Key)
@@ -472,7 +432,7 @@ func (s *Server) Get(req *GetReqeust, resp *GetResponse) error {
 		"key":        string(req.Key),
 	}).Debug("Get")
 
-	return nil
+	return resp, nil
 }
 
 // PutReqeust has get request data.

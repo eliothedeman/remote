@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package remote;
+
+service DBServer {
+    rpc Ping (Empty) returns (PingResponse);
+    rpc DBStats (Empty) returns (DBStatsResponse);
+    rpc BeginTransaction (BeginTransactionRequest) returns (ContextHeader);
+    rpc CommitTransaction (ContextHeader) returns (Empty);
+    rpc RollbackTransaction (ContextHeader) returns (Empty);
+    rpc Bucket (BucketRequest) returns (BucketResponse);
+    rpc CreateBucket (BucketRequest) returns (BucketResponse);
+    rpc CreateBucketIfNotExists (BucketRequest) returns (BucketResponse);
+    rpc DeleteBucket (BucketRequest) returns (Empty);
+    rpc Get (GetRequest) returns (GetResponse);
+    rpc Put (PutRequest) returns (Empty);
+}
+
+message PutRequest {
+    ContextHeader ctx = 1;
+    string key = 2;
+    string val = 3;
+}
+
+message GetResponse {
+    ContextHeader ctx = 1;
+    string val = 2;
+}
+
+message GetRequest {
+    ContextHeader ctx = 1;
+    string key = 2;
+}
+
+message BucketRequest {
+    ContextHeader ctx = 1;
+    string key = 2;
+}
+
+message BucketResponse {
+    uint64 bucketID = 1;
+    ContextHeader ctx = 2;
+}
+
+message BeginTransactionRequest {
+    bool writable = 1;
+}
+
+message Empty {
+}
+
+message ContextHeader {
+    uint64 id = 1;
+    uint64 parentID = 2;
+}
+
+message PingResponse {
+    Time received = 1;
+}
+
+message TxStatsResponse {
+    int64 PageCount = 1;
+    int64 PageAlloc = 2;
+    int64 CursorCount = 3;
+    int64 NodeCount = 4;
+    int64 NodeDeref = 5;
+    int64 Rebalance = 6;
+    int64 Split = 7;
+    int64 Spill = 8;
+    int64 SpillTime = 9;
+    int64 Write = 10;
+    int64 WriteTime = 11;
+}
+
+message DBStatsResponse {
+    int64 FreePageN = 1;
+    int64 PendingPageN = 2;
+    int64 FreeAlloc = 3;
+    int64 FreelistInuse = 4;
+    int64 TxN = 5;
+    int64 OpenTxN = 6;
+    TxStatsResponse TxStats = 8;
+}
+
+message Time {
+    int64 seconds = 1;
+    int32 nseconds = 2;
+}

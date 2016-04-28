@@ -75,7 +75,31 @@ func (r *RClient) Stats() bolt.Stats {
 	if err != nil {
 		log.Println(err)
 	}
-	return resp.Stats
+
+	s := bolt.Stats{}
+	s.FreeAlloc = int(resp.FreeAlloc)
+	s.FreePageN = int(resp.FreePageN)
+	s.FreelistInuse = int(resp.FreelistInuse)
+	s.OpenTxN = int(resp.OpenTxN)
+	s.PendingPageN = int(resp.PendingPageN)
+	s.TxN = int(resp.TxN)
+	x := resp.TxStats
+	if x == nil {
+		return s
+	}
+	s.TxStats.CursorCount = int(x.CursorCount)
+	s.TxStats.NodeCount = int(x.NodeCount)
+	s.TxStats.NodeDeref = int(x.NodeDeref)
+	s.TxStats.PageAlloc = int(x.PageAlloc)
+	s.TxStats.PageCount = int(x.PageCount)
+	s.TxStats.Rebalance = int(x.Rebalance)
+	s.TxStats.Spill = int(x.Spill)
+	s.TxStats.SpillTime = time.Duration(x.SpillTime)
+	s.TxStats.Split = int(x.Split)
+	s.TxStats.Write = int(x.Write)
+	s.TxStats.WriteTime = time.Duration(x.WriteTime)
+
+	return s
 }
 
 // Begin a transaction.
